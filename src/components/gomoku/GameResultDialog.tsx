@@ -117,6 +117,7 @@ export function GameResultDialog({ onRestart, onHome }: GameResultDialogProps) {
           <Button
             variant="outline"
             size="sm"
+            className="flex-1"
             onClick={handleHome}
           >
             <Home className="w-4 h-4 mr-1" />
@@ -124,6 +125,7 @@ export function GameResultDialog({ onRestart, onHome }: GameResultDialogProps) {
           </Button>
           <Button
             size="sm"
+            className="flex-1"
             onClick={handleRestart}
           >
             <RotateCcw className="w-4 h-4 mr-1" />

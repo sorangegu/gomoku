@@ -336,7 +336,7 @@ export default function HomePage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
-              className="w-full max-w-2xl flex flex-col items-center gap-6"
+              className="w-full max-w-2xl flex flex-col items-center gap-3 py-2"
             >
               <GameInfo />
               <GomokuBoard 
@@ -372,11 +372,13 @@ export default function HomePage() {
       </div>
 
       {/* Footer */}
-      <footer className="sticky bottom-0 border-t bg-background/80 backdrop-blur-sm py-4">
-        <div className="container text-center text-sm text-muted-foreground">
-          <p>经典五子棋对战 · 人机与在线模式</p>
-        </div>
-      </footer>
+      {screen === 'menu' && (
+        <footer className="border-t bg-background/80 backdrop-blur-sm py-4">
+          <div className="container text-center text-sm text-muted-foreground">
+            <p>经典五子棋对战 · 人机与在线模式</p>
+          </div>
+        </footer>
+      )}
 
       <Toaster position="top-center" />
     </main>
