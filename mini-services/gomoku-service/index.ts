@@ -131,6 +131,57 @@ io.on('connection', (socket: Socket) => {
     callback({ roomId, color: 'black' })
   })
 
+  // 重新加入房间（刷新页面后恢复状态）
+  socket.on('rejoin-room', (data: { roomId: string; playerId: string }, callback: (data: { success: boolean; error?: string; room?: GameRoom; player?: Player }) => void) => {
+    const { roomId, playerId } = data
+    const room = rooms.get(roomId)
+
+    if (!room) {
+      callback({ success: false, error: '房间不存在或已过期' })
+      return
+    }
+
+    // 查找玩家（可能 socket id 已变化）
+    let player: Player | null = null
+    let oldSocketId: string | null = null
+    
+    for (const [id, p] of room.players) {
+      // 通过 playerId 匹配（存储在 player 对象中）
+      if (p.id === playerId || id === playerId) {
+        player = p
+        oldSocketId = id
+        break
+      }
+    }
+
+    if (!player) {
+      callback({ success: false, error: '你不在该房间中' })
+      return
+    }
+
+    // 更新 socket id
+    if (oldSocketId && oldSocketId !== socket.id) {
+      room.players.delete(oldSocketId)
+      player.id = socket.id
+      room.players.set(socket.id, player)
+    }
+    socket.join(roomId)
+
+    // 恢复棋盘状态
+    const roomData = {
+      ...room,
+      board: room.board,
+      currentTurn: room.currentTurn,
+      status: room.status,
+      players: Object.fromEntries(room.players)
+    }
+
+    callback({ success: true, room: roomData, player })
+    
+    // 通知对手玩家已重连
+    socket.to(roomId).emit('player-rejoined', { playerId: socket.id })
+  })
+
   // 加入房间
   socket.on('join-room', (data: { roomId: string }, callback: (data: { success: boolean; error?: string; color?: string; room?: GameRoom }) => void) => {
     const { roomId } = data

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { io, Socket } from 'socket.io-client'
 import { GomokuBoard } from '@/components/gomoku/GomokuBoard'
@@ -18,6 +18,7 @@ type GameScreen = 'menu' | 'ai' | 'online-lobby' | 'online-game'
 
 export default function HomePage() {
   const [socket, setSocket] = useState<Socket | null>(null)
+  const hasReconnected = useRef(false)
 
   const {
     mode,
@@ -35,15 +36,37 @@ export default function HomePage() {
     requestRestart,
   } = useGomokuStore()
 
-  // 检查URL参数，决定初始屏幕
+  // 检查URL参数或保存的状态，决定初始屏幕
   const initialScreen = useMemo<GameScreen>(() => {
     if (typeof window === 'undefined') return 'menu'
     const params = new URLSearchParams(window.location.search)
-    const roomId = params.get('room')
-    return roomId ? 'online-lobby' : 'menu'
+    const roomFromUrl = params.get('room')
+    if (roomFromUrl) return 'online-lobby'
+    
+    // 检查保存的游戏状态
+    const savedState = localStorage.getItem('gomoku-storage')
+    if (savedState) {
+      try {
+        const parsed = JSON.parse(savedState)
+        if (parsed.state?.mode === 'ai' && parsed.state?.status === 'playing') {
+          return 'ai'
+        }
+        if (parsed.state?.mode === 'online' && parsed.state?.onlineGame?.roomId) {
+          return 'online-lobby' // 需要重新连接
+        }
+      } catch (e) {}
+    }
+    return 'menu'
   }, [])
 
   const [screen, setScreen] = useState<GameScreen>(initialScreen)
+
+  // 刷新后恢复人机对战状态
+  useEffect(() => {
+    if (mode === 'ai' && status === 'playing' && initialScreen === 'ai') {
+      setScreen('ai')
+    }
+  }, [])
 
   // 开始AI游戏
   const handleStartAI = useCallback((playerColor: Player, aiLevel: number) => {
@@ -68,6 +91,22 @@ export default function HomePage() {
       socket.disconnect()
       setSocket(null)
     }
+    // 清除保存的在线游戏状态
+    useGomokuStore.getState().updateFromServer({
+      mode: null,
+      status: 'idle',
+      onlineGame: {
+        roomId: null,
+        playerId: null,
+        playerColor: null,
+        opponentConnected: false,
+        opponentReady: false,
+        playerReady: false,
+        blackFirst: true,
+        undoRequestFrom: null,
+        restartRequestFrom: null,
+      }
+    })
     setScreen('menu')
   }, [socket])
 
@@ -96,12 +135,64 @@ export default function HomePage() {
     }
   }, [socket, onlineGame.roomId])
 
+  // 在线模式重连逻辑
+  useEffect(() => {
+    if (mode !== 'online' || !onlineGame.roomId || hasReconnected.current) return
+    if (screen !== 'online-lobby') return
+    
+    hasReconnected.current = true
+    
+    // 尝试重新连接房间
+    const newSocket = io({
+      path: '/socket.io/',
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 3,
+      timeout: 10000,
+    })
+
+    newSocket.on('connect', () => {
+      // 尝试重新加入房间
+      newSocket.emit('rejoin-room', { 
+        roomId: onlineGame.roomId, 
+        playerId: onlineGame.playerId 
+      }, (data: any) => {
+        if (data.success) {
+          toast.success('已重新连接到房间')
+          setSocket(newSocket)
+          
+          // 如果游戏正在进行，直接进入游戏界面
+          if (data.room?.status === 'playing') {
+            updateFromServer({
+              status: 'playing',
+              currentTurn: data.room.currentTurn,
+              board: data.room.board,
+            })
+            setScreen('online-game')
+          }
+        } else {
+          // 重连失败，清除状态
+          toast.error('房间已失效，请重新创建')
+          handleBackToMenu()
+          newSocket.disconnect()
+        }
+      })
+    })
+
+    newSocket.on('connect_error', () => {
+      toast.error('连接失败')
+    })
+
+    return () => {
+      newSocket.off('connect')
+      newSocket.off('connect_error')
+    }
+  }, [mode, onlineGame.roomId, screen])
+
   // 设置Socket事件监听
   useEffect(() => {
     if (!socket) return
 
     socket.on('move', (data: any) => {
-      // 更新本地棋盘
       const newBoard = board.map(row => [...row])
       newBoard[data.row][data.col] = data.color
       updateFromServer({
@@ -113,7 +204,6 @@ export default function HomePage() {
     })
 
     socket.on('undo-requested', (data: any) => {
-      // 显示悔棋请求对话框
       toast.info('对手请求悔棋', {
         action: {
           label: '同意',
@@ -174,11 +264,20 @@ export default function HomePage() {
         winner: null,
       })
       setPlayerReady(false)
+      setScreen('online-lobby')
       toast.success('游戏已重置')
     })
 
     socket.on('restart-rejected', () => {
       toast.error('对手拒绝了重新开始请求')
+    })
+
+    socket.on('player-left', () => {
+      toast.error('对手已离开房间')
+    })
+
+    socket.on('disconnect', () => {
+      console.log('Disconnected from server')
     })
 
     return () => {
@@ -189,6 +288,8 @@ export default function HomePage() {
       socket.off('restart-requested')
       socket.off('restart-accepted')
       socket.off('restart-rejected')
+      socket.off('player-left')
+      socket.off('disconnect')
     }
   }, [socket, board, onlineGame.roomId, updateFromServer, setPlayerReady])
 
