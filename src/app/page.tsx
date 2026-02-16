@@ -135,8 +135,13 @@ export default function HomePage() {
     }
   }, [socket, onlineGame.roomId])
 
-  // 在线模式重连逻辑
+  // 在线模式重连逻辑（仅当从 localStorage 恢复时，不是从 URL 参数进入）
   useEffect(() => {
+    // 如果有 URL 参数，让 OnlineLobby 处理加入逻辑
+    const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+    const roomFromUrl = params?.get('room')
+    if (roomFromUrl) return // URL 参数由 OnlineLobby 处理
+    
     if (mode !== 'online' || !onlineGame.roomId || hasReconnected.current) return
     if (screen !== 'online-lobby') return
     
