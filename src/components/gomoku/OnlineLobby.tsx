@@ -109,7 +109,7 @@ export function OnlineLobby({ onGameStart }: OnlineLobbyProps) {
     setupSocketListeners(newSocket, true)
 
     newSocket.on('connect', () => {
-      newSocket.emit('create-room', (data: { roomId: string; color: string }) => {
+      newSocket.emit('create-room', { persistentId: playerId }, (data: { roomId: string; color: string }) => {
         console.log('Room created:', data)
         setRoomId(data.roomId)
         setPlayerColor(data.color as 'black' | 'white')
@@ -144,7 +144,7 @@ export function OnlineLobby({ onGameStart }: OnlineLobbyProps) {
     setupSocketListeners(newSocket, false)
 
     newSocket.on('connect', () => {
-      newSocket.emit('join-room', { roomId: targetRoomId.toUpperCase() }, (data: any) => {
+      newSocket.emit('join-room', { roomId: targetRoomId.toUpperCase(), persistentId: playerId }, (data: any) => {
         console.log('Join room response:', data)
         if (data.success) {
           setRoomId(targetRoomId.toUpperCase())

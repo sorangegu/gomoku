@@ -19,7 +19,8 @@ interface Position {
 }
 
 interface Player {
-  id: string
+  id: string           // socket id
+  persistentId: string // 持久化的玩家ID（用于重连）
   color: 'black' | 'white'
   ready: boolean
 }
@@ -33,9 +34,9 @@ interface GameRoom {
   history: (string | null)[][][]
   status: 'waiting' | 'playing' | 'finished'
   winner: 'black' | 'white' | 'draw' | null
-  blackFirst: boolean // 黑棋先手，一局一换
-  undoRequest: string | null // 悔棋请求者ID
-  restartRequest: string | null // 重开请求者ID
+  blackFirst: boolean
+  undoRequest: string | null
+  restartRequest: string | null
   createdAt: Date
 }
 
@@ -64,7 +65,6 @@ const checkWin = (board: (string | null)[][], row: number, col: number, color: s
   for (const [dr, dc] of directions) {
     let count = 1
 
-    // 正方向
     for (let i = 1; i < 5; i++) {
       const newRow = row + dr * i
       const newCol = col + dc * i
@@ -75,7 +75,6 @@ const checkWin = (board: (string | null)[][], row: number, col: number, color: s
       }
     }
 
-    // 反方向
     for (let i = 1; i < 5; i++) {
       const newRow = row - dr * i
       const newCol = col - dc * i
@@ -109,11 +108,13 @@ io.on('connection', (socket: Socket) => {
   console.log(`User connected: ${socket.id}`)
 
   // 创建房间
-  socket.on('create-room', (callback: (data: { roomId: string; color: string }) => void) => {
+  socket.on('create-room', (data: { persistentId?: string }, callback: (data: { roomId: string; color: string }) => void) => {
     const roomId = generateRoomId()
+    const persistentId = data?.persistentId || socket.id
+    
     const room: GameRoom = {
       id: roomId,
-      players: new Map([[socket.id, { id: socket.id, color: 'black', ready: false }]]),
+      players: new Map([[socket.id, { id: socket.id, persistentId, color: 'black', ready: false }]]),
       board: initBoard(),
       currentTurn: 'black',
       moves: [],
@@ -127,27 +128,71 @@ io.on('connection', (socket: Socket) => {
     }
     rooms.set(roomId, room)
     socket.join(roomId)
-    console.log(`Room created: ${roomId} by ${socket.id}`)
+    console.log(`Room created: ${roomId} by ${socket.id} (persistent: ${persistentId})`)
     callback({ roomId, color: 'black' })
   })
 
+  // 加入房间
+  socket.on('join-room', (data: { roomId: string; persistentId?: string }, callback: (data: { success: boolean; error?: string; color?: string; room?: GameRoom }) => void) => {
+    const { roomId, persistentId } = data
+    const room = rooms.get(roomId)
+
+    console.log(`Join room request: ${roomId} by ${socket.id}, room exists: ${!!room}`)
+
+    if (!room) {
+      callback({ success: false, error: '房间不存在' })
+      return
+    }
+
+    if (room.players.size >= 2) {
+      callback({ success: false, error: '房间已满' })
+      return
+    }
+
+    if (room.status !== 'waiting') {
+      callback({ success: false, error: '游戏已开始' })
+      return
+    }
+
+    const playerPersistentId = persistentId || socket.id
+    const player: Player = { 
+      id: socket.id, 
+      persistentId: playerPersistentId, 
+      color: 'white', 
+      ready: false 
+    }
+    room.players.set(socket.id, player)
+    socket.join(roomId)
+    
+    console.log(`Player ${socket.id} joined room ${roomId}`)
+    
+    // 通知房间内所有人
+    io.to(roomId).emit('player-joined', {
+      player,
+      room: { ...room, players: Object.fromEntries(room.players) }
+    })
+    
+    callback({ success: true, color: 'white', room: { ...room, players: Object.fromEntries(room.players) } })
+  })
+
   // 重新加入房间（刷新页面后恢复状态）
-  socket.on('rejoin-room', (data: { roomId: string; playerId: string }, callback: (data: { success: boolean; error?: string; room?: GameRoom; player?: Player }) => void) => {
+  socket.on('rejoin-room', (data: { roomId: string; playerId: string }, callback: (data: { success: boolean; error?: string; room?: any; player?: Player }) => void) => {
     const { roomId, playerId } = data
     const room = rooms.get(roomId)
+
+    console.log(`Rejoin room request: ${roomId} by ${socket.id}, playerId: ${playerId}`)
 
     if (!room) {
       callback({ success: false, error: '房间不存在或已过期' })
       return
     }
 
-    // 查找玩家（可能 socket id 已变化）
+    // 查找玩家（通过持久化ID匹配）
     let player: Player | null = null
     let oldSocketId: string | null = null
     
     for (const [id, p] of room.players) {
-      // 通过 playerId 匹配（存储在 player 对象中）
-      if (p.id === playerId || id === playerId) {
+      if (p.persistentId === playerId || id === playerId) {
         player = p
         oldSocketId = id
         break
@@ -167,7 +212,6 @@ io.on('connection', (socket: Socket) => {
     }
     socket.join(roomId)
 
-    // 恢复棋盘状态
     const roomData = {
       ...room,
       board: room.board,
@@ -180,66 +224,7 @@ io.on('connection', (socket: Socket) => {
     
     // 通知对手玩家已重连
     socket.to(roomId).emit('player-rejoined', { playerId: socket.id })
-  })
-
-  // 加入房间
-  socket.on('join-room', (data: { roomId: string }, callback: (data: { success: boolean; error?: string; color?: string; room?: GameRoom }) => void) => {
-    const { roomId } = data
-    const room = rooms.get(roomId)
-
-    if (!room) {
-      callback({ success: false, error: '房间不存在' })
-      return
-    }
-
-    if (room.players.size >= 2) {
-      callback({ success: false, error: '房间已满' })
-      return
-    }
-
-    if (room.status !== 'waiting') {
-      callback({ success: false, error: '游戏已开始' })
-      return
-    }
-
-    const player: Player = { id: socket.id, color: 'white', ready: false }
-    room.players.set(socket.id, player)
-    socket.join(roomId)
-    
-    console.log(`Player ${socket.id} joined room ${roomId}`)
-    
-    // 通知房间内所有人
-    io.to(roomId).emit('player-joined', {
-      player,
-      room: { ...room, players: Object.fromEntries(room.players) }
-    })
-    
-    callback({ success: true, color: 'white', room: { ...room, players: Object.fromEntries(room.players) } })
-  })
-
-  // 重新加入房间（刷新页面后恢复状态）
-  socket.on('rejoin-room', (data: { roomId: string; playerId: string }, callback: (data: { success: boolean; error?: string; room?: GameRoom; player?: Player }) => void) => {
-    const { roomId, playerId } = data
-    const room = rooms.get(roomId)
-
-    if (!room) {
-      callback({ success: false, error: '房间不存在' })
-      return
-    }
-
-    const player = room.players.get(playerId)
-    if (!player) {
-      callback({ success: false, error: '玩家不在房间中' })
-      return
-    }
-
-    // 更新socket id
-    room.players.delete(playerId)
-    player.id = socket.id
-    room.players.set(socket.id, player)
-    socket.join(roomId)
-
-    callback({ success: true, room: { ...room, players: Object.fromEntries(room.players) }, player })
+    console.log(`Player ${socket.id} rejoined room ${roomId}`)
   })
 
   // 准备游戏
@@ -259,7 +244,6 @@ io.on('connection', (socket: Socket) => {
 
     if (allReady && room.players.size === 2) {
       room.status = 'playing'
-      // 切换先手（一局一换）
       room.blackFirst = !room.blackFirst
       room.currentTurn = room.blackFirst ? 'black' : 'white'
       io.to(roomId).emit('game-start', {
@@ -306,7 +290,7 @@ io.on('connection', (socket: Socket) => {
       return
     }
 
-    // 保存历史状态用于悔棋
+    // 保存历史状态
     const boardCopy = room.board.map(row => [...row])
     room.history.push(boardCopy)
 
@@ -325,15 +309,12 @@ io.on('connection', (socket: Socket) => {
       room.status = 'finished'
       room.winner = 'draw'
     } else {
-      // 切换回合
       room.currentTurn = room.currentTurn === 'black' ? 'white' : 'black'
     }
 
-    // 清除悔棋和重开请求
     room.undoRequest = null
     room.restartRequest = null
 
-    // 广播落子
     io.to(roomId).emit('move', {
       row,
       col,
@@ -359,17 +340,12 @@ io.on('connection', (socket: Socket) => {
 
     if (room.history.length === 0) return
 
-    // 设置悔棋请求
     room.undoRequest = socket.id
 
-    // 通知对手
-    const opponent = getOpponent(socket.id, room)
-    if (opponent) {
-      socket.to(roomId).emit('undo-requested', {
-        requesterId: socket.id,
-        requesterColor: player.color
-      })
-    }
+    socket.to(roomId).emit('undo-requested', {
+      requesterId: socket.id,
+      requesterColor: player.color
+    })
   })
 
   // 响应悔棋请求
@@ -378,23 +354,19 @@ io.on('connection', (socket: Socket) => {
     const room = rooms.get(roomId)
 
     if (!room || room.status !== 'playing') return
-
     if (!room.undoRequest) return
 
     if (accept) {
-      // 执行悔棋 - 撤销最后两步（双方各一步）
       if (room.history.length >= 2) {
-        room.history.pop() // 移除当前状态
-        const prevState = room.history.pop() // 移除上一步状态
+        room.history.pop()
+        const prevState = room.history.pop()
         if (prevState) {
           room.board = prevState
           room.moves.pop()
           room.moves.pop()
-          // 切换回合
           room.currentTurn = room.currentTurn === 'black' ? 'white' : 'black'
         }
       } else if (room.history.length === 1) {
-        // 只有一方落子，撤销一步
         room.board = room.history.pop()!
         room.moves.pop()
         room.currentTurn = room.currentTurn === 'black' ? 'white' : 'black'
@@ -424,7 +396,6 @@ io.on('connection', (socket: Socket) => {
 
     room.restartRequest = socket.id
 
-    // 通知对手
     socket.to(roomId).emit('restart-requested', {
       requesterId: socket.id,
       requesterColor: player.color
@@ -437,11 +408,9 @@ io.on('connection', (socket: Socket) => {
     const room = rooms.get(roomId)
 
     if (!room) return
-
     if (!room.restartRequest) return
 
     if (accept) {
-      // 重置游戏
       room.board = initBoard()
       room.moves = []
       room.history = []
@@ -450,7 +419,6 @@ io.on('connection', (socket: Socket) => {
       room.undoRequest = null
       room.restartRequest = null
       
-      // 重置准备状态
       for (const player of room.players.values()) {
         player.ready = false
       }
@@ -477,13 +445,11 @@ io.on('connection', (socket: Socket) => {
       room.players.delete(socket.id)
       socket.leave(roomId)
       
-      // 通知对手
       socket.to(roomId).emit('player-left', {
         playerId: socket.id,
         playerColor: player.color
       })
 
-      // 如果房间空了，删除房间
       if (room.players.size === 0) {
         rooms.delete(roomId)
       }
@@ -494,7 +460,6 @@ io.on('connection', (socket: Socket) => {
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`)
     
-    // 查找该玩家所在的所有房间
     for (const [roomId, room] of rooms) {
       const player = room.players.get(socket.id)
       if (player) {
@@ -504,9 +469,9 @@ io.on('connection', (socket: Socket) => {
           playerColor: player.color
         })
 
-        // 如果房间空了，删除房间
         if (room.players.size === 0) {
           rooms.delete(roomId)
+          console.log(`Room ${roomId} deleted (empty)`)
         }
       }
     }
