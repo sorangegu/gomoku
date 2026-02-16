@@ -1,141 +1,85 @@
-# 🚀 Welcome to Z.ai Code Scaffold
+# 🎮 五子棋在线对战
 
-A modern, production-ready web application scaffold powered by cutting-edge technologies, designed to accelerate your development with [Z.ai](https://chat.z.ai)'s AI-powered coding assistance.
+一个现代化的五子棋游戏，支持人机对战和在线双人对战。
 
-## ✨ Technology Stack
+## ✨ 功能特性
 
-This scaffold provides a robust foundation built with:
+- **🎯 人机对战** - 与 AI 对弈，支持 3 个难度等级
+- **👥 在线对战** - 创建房间邀请好友对战
+- **🎨 精美界面** - 现代化 UI 设计，支持明暗主题
+- **📱 响应式布局** - 完美适配各种设备
 
-### 🎯 Core Framework
-- **⚡ Next.js 16** - The React framework for production with App Router
-- **📘 TypeScript 5** - Type-safe JavaScript for better developer experience
-- **🎨 Tailwind CSS 4** - Utility-first CSS framework for rapid UI development
+## 🛠 技术栈
 
-### 🧩 UI Components & Styling
-- **🧩 shadcn/ui** - High-quality, accessible components built on Radix UI
-- **🎯 Lucide React** - Beautiful & consistent icon library
-- **🌈 Framer Motion** - Production-ready motion library for React
-- **🎨 Next Themes** - Perfect dark mode in 2 lines of code
+### 前端
+- **Next.js 16** - React 框架
+- **TypeScript** - 类型安全
+- **Tailwind CSS 4** - 样式框架
+- **shadcn/ui** - UI 组件库
+- **Framer Motion** - 动画效果
+- **Zustand** - 状态管理
+- **Socket.io** - 实时通信
 
-### 📋 Forms & Validation
-- **🎣 React Hook Form** - Performant forms with easy validation
-- **✅ Zod** - TypeScript-first schema validation
+### 后端
+- **Bun** - JavaScript 运行时
+- **Socket.io** - WebSocket 服务
+- **Prisma** - 数据库 ORM
 
-### 🔄 State Management & Data Fetching
-- **🐻 Zustand** - Simple, scalable state management
-- **🔄 TanStack Query** - Powerful data synchronization for React
-- **🌐 Fetch** - Promise-based HTTP request
+## 🚀 快速开始
 
-### 🗄️ Database & Backend
-- **🗄️ Prisma** - Next-generation TypeScript ORM
-- **🔐 NextAuth.js** - Complete open-source authentication solution
-
-### 🎨 Advanced UI Features
-- **📊 TanStack Table** - Headless UI for building tables and datagrids
-- **🖱️ DND Kit** - Modern drag and drop toolkit for React
-- **📊 Recharts** - Redefined chart library built with React and D3
-- **🖼️ Sharp** - High performance image processing
-
-### 🌍 Internationalization & Utilities
-- **🌍 Next Intl** - Internationalization library for Next.js
-- **📅 Date-fns** - Modern JavaScript date utility library
-- **🪝 ReactUse** - Collection of essential React hooks for modern development
-
-## 🎯 Why This Scaffold?
-
-- **🏎️ Fast Development** - Pre-configured tooling and best practices
-- **🎨 Beautiful UI** - Complete shadcn/ui component library with advanced interactions
-- **🔒 Type Safety** - Full TypeScript configuration with Zod validation
-- **📱 Responsive** - Mobile-first design principles with smooth animations
-- **🗄️ Database Ready** - Prisma ORM configured for rapid backend development
-- **🔐 Auth Included** - NextAuth.js for secure authentication flows
-- **📊 Data Visualization** - Charts, tables, and drag-and-drop functionality
-- **🌍 i18n Ready** - Multi-language support with Next Intl
-- **🚀 Production Ready** - Optimized build and deployment settings
-- **🤖 AI-Friendly** - Structured codebase perfect for AI assistance
-
-## 🚀 Quick Start
+### 本地开发
 
 ```bash
-# Install dependencies
+# 安装依赖
 bun install
 
-# Start development server
+# 生成 Prisma 客户端
+bun run db:generate
+
+# 启动开发服务器
 bun run dev
-
-# Build for production
-bun run build
-
-# Start production server
-bun start
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to see your application running.
+### Docker 部署
 
-## 🤖 Powered by Z.ai
+```bash
+# 使用开发配置（代码挂载，无需重新构建镜像）
+docker compose -f docker-compose.dev.yml up -d
 
-This scaffold is optimized for use with [Z.ai](https://chat.z.ai) - your AI assistant for:
-
-- **💻 Code Generation** - Generate components, pages, and features instantly
-- **🎨 UI Development** - Create beautiful interfaces with AI assistance  
-- **🔧 Bug Fixing** - Identify and resolve issues with intelligent suggestions
-- **📝 Documentation** - Auto-generate comprehensive documentation
-- **🚀 Optimization** - Performance improvements and best practices
-
-Ready to build something amazing? Start chatting with Z.ai at [chat.z.ai](https://chat.z.ai) and experience the future of AI-powered development!
-
-## 📁 Project Structure
-
-```
-src/
-├── app/                 # Next.js App Router pages
-├── components/          # Reusable React components
-│   └── ui/             # shadcn/ui components
-├── hooks/              # Custom React hooks
-└── lib/                # Utility functions and configurations
+# 使用生产配置（构建镜像）
+docker compose up -d --build
 ```
 
-## 🎨 Available Features & Components
+## 📁 项目结构
 
-This scaffold includes a comprehensive set of modern web development tools:
+```
+├── src/
+│   ├── app/              # Next.js 页面
+│   ├── components/       # React 组件
+│   │   ├── ui/          # shadcn/ui 组件
+│   │   └── gomoku/      # 五子棋游戏组件
+│   ├── hooks/           # 自定义 Hooks
+│   ├── lib/             # 工具函数
+│   └── stores/          # Zustand 状态管理
+├── mini-services/
+│   └── gomoku-service/  # WebSocket 服务
+├── prisma/              # 数据库 Schema
+└── public/              # 静态资源
+```
 
-### 🧩 UI Components (shadcn/ui)
-- **Layout**: Card, Separator, Aspect Ratio, Resizable Panels
-- **Forms**: Input, Textarea, Select, Checkbox, Radio Group, Switch
-- **Feedback**: Alert, Toast (Sonner), Progress, Skeleton
-- **Navigation**: Breadcrumb, Menubar, Navigation Menu, Pagination
-- **Overlay**: Dialog, Sheet, Popover, Tooltip, Hover Card
-- **Data Display**: Badge, Avatar, Calendar
+## 🎯 游戏规则
 
-### 📊 Advanced Data Features
-- **Tables**: Powerful data tables with sorting, filtering, pagination (TanStack Table)
-- **Charts**: Beautiful visualizations with Recharts
-- **Forms**: Type-safe forms with React Hook Form + Zod validation
+1. 黑棋先行，双方轮流落子
+2. 先在横、竖、斜任意方向连成五子者获胜
+3. 在线模式下双方都需要点击"准备就绪"后才能开始
 
-### 🎨 Interactive Features
-- **Animations**: Smooth micro-interactions with Framer Motion
-- **Drag & Drop**: Modern drag-and-drop functionality with DND Kit
-- **Theme Switching**: Built-in dark/light mode support
+## 📝 更新日志
 
-### 🔐 Backend Integration
-- **Authentication**: Ready-to-use auth flows with NextAuth.js
-- **Database**: Type-safe database operations with Prisma
-- **API Client**: HTTP requests with Fetch + TanStack Query
-- **State Management**: Simple and scalable with Zustand
+### v0.2.0
+- 新增在线双人对战功能
+- 优化 AI 算法
+- 改进用户界面
 
-### 🌍 Production Features
-- **Internationalization**: Multi-language support with Next Intl
-- **Image Optimization**: Automatic image processing with Sharp
-- **Type Safety**: End-to-end TypeScript with Zod validation
-- **Essential Hooks**: 100+ useful React hooks with ReactUse for common patterns
+## 📄 许可证
 
-## 🤝 Get Started with Z.ai
-
-1. **Clone this scaffold** to jumpstart your project
-2. **Visit [chat.z.ai](https://chat.z.ai)** to access your AI coding assistant
-3. **Start building** with intelligent code generation and assistance
-4. **Deploy with confidence** using the production-ready setup
-
----
-
-Built with ❤️ for the developer community. Supercharged by [Z.ai](https://chat.z.ai) 🚀
+MIT License
