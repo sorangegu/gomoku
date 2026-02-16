@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Trophy, Frown, Handshake, RotateCcw, Home } from 'lucide-react'
+import { Trophy, XCircle, Handshake, RotateCcw, Home } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -52,7 +52,7 @@ export function GameResultDialog({ onRestart, onHome }: GameResultDialogProps) {
       }
     } else {
       return {
-        icon: <Frown className="w-10 h-10 text-red-400" />,
+        icon: <XCircle className="w-10 h-10 text-red-400" />,
         title: '失败',
         description: '再接再厉',
         color: 'text-red-400',
