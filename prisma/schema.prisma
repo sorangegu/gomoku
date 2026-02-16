@@ -1,0 +1,51 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 游戏房间
+model GameRoom {
+  id            String    @id @default(cuid())
+  roomId        String    @unique // 用于分享的房间ID
+  blackPlayerId String?   // 黑棋玩家ID
+  whitePlayerId String?   // 白棋玩家ID
+  status        String    @default("waiting") // waiting, playing, finished
+  currentTurn   String    @default("black") // black, white
+  winner        String?   // black, white, draw
+  moves         String    @default("[]") // JSON存储落子记录
+  blackFirst    Boolean   @default(true) // 黑棋是否先手（一局一换）
+  history       String    @default("[]") // JSON存储历史记录用于悔棋
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // 请求状态
+  undoRequest   String?   // 悔棋请求: requesterId
+  restartRequest String?  // 重新开始请求: requesterId
+  
+  // 玩家准备状态
+  blackReady    Boolean   @default(false)
+  whiteReady    Boolean   @default(false)
+}
+
+// 单机游戏状态（用于持久化人机模式）
+model SingleGame {
+  id          String   @id @default(cuid())
+  playerId    String   @unique // 玩家标识
+  board       String   @default("") // JSON存储棋盘状态
+  currentTurn String   @default("black")
+  moves       String   @default("[]")
+  history     String   @default("[]")
+  gameOver    Boolean  @default(false)
+  winner      String?
+  playerColor String   @default("black") // 玩家执黑还是白
+  aiLevel     Int      @default(2) // AI难度等级
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

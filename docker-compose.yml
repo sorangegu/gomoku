@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  # Next.js 应用
+  gomoku-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gomoku-app
+    restart: unless-stopped
+    ports:
+      - "6000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/data/gomoku.db
+    volumes:
+      - gomoku-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - gomoku-network
+
+  # WebSocket 服务
+  gomoku-ws:
+    build:
+      context: .
+      dockerfile: Dockerfile.ws
+    container_name: gomoku-ws
+    restart: unless-stopped
+    ports:
+      - "6003:3003"
+    environment:
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - gomoku-network
+
+volumes:
+  gomoku-data:
+    driver: local
+
+networks:
+  gomoku-network:
+    driver: bridge

@@ -1,0 +1,49 @@
+# 开发环境配置 - 使用 volumes 挂载代码，无需重新构建镜像
+services:
+  # Next.js 应用
+  gomoku-app:
+    image: oven/bun:1
+    container_name: gomoku-app
+    restart: unless-stopped
+    ports:
+      - "6000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/data/gomoku.db
+    volumes:
+      - ./:/app
+      - gomoku-data:/app/data
+      - gomoku-node-modules:/app/node_modules
+    working_dir: /app
+    command: sh -c "bun install && bun run db:generate && bun run build && bun .next/standalone/server.js"
+    networks:
+      - gomoku-network
+
+  # WebSocket 服务
+  gomoku-ws:
+    image: oven/bun:1
+    container_name: gomoku-ws
+    restart: unless-stopped
+    ports:
+      - "6003:3003"
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./mini-services/gomoku-service:/app
+      - gomoku-ws-node-modules:/app/node_modules
+    working_dir: /app
+    command: sh -c "bun install && bun index.ts"
+    networks:
+      - gomoku-network
+
+volumes:
+  gomoku-data:
+    driver: local
+  gomoku-node-modules:
+    driver: local
+  gomoku-ws-node-modules:
+    driver: local
+
+networks:
+  gomoku-network:
+    driver: bridge
