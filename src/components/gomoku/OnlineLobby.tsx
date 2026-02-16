@@ -37,12 +37,80 @@ export function OnlineLobby({ onGameStart }: OnlineLobbyProps) {
       // 清除URL参数，避免刷新时重复加入
       window.history.replaceState({}, '', window.location.pathname)
       setJoinRoomId(roomFromUrl.toUpperCase())
-      // 自动尝试加入房间
-      setTimeout(() => {
-        handleJoinRoom(roomFromUrl.toUpperCase())
-      }, 500)
+      
+      // 直接在这里处理加入房间，避免闭包问题
+      const playerId = getPlayerId()
+      
+      const newSocket = io({
+        path: '/socket.io/',
+        transports: ['websocket', 'polling'],
+        reconnectionAttempts: 5,
+        timeout: 10000,
+      })
+
+      newSocket.on('connect', () => {
+        console.log('Connected to server, joining room:', roomFromUrl.toUpperCase())
+        newSocket.emit('join-room', { roomId: roomFromUrl.toUpperCase(), persistentId: playerId }, (data: any) => {
+          console.log('Join room response:', data)
+          if (data.success) {
+            setRoomId(roomFromUrl.toUpperCase())
+            setPlayerColor(data.color as 'black' | 'white')
+            setStep('waiting')
+            startOnlineGame(roomFromUrl.toUpperCase(), playerId, data.color as 'black' | 'white')
+            setOpponentConnected(true)
+            setIsConnecting(false)
+            setSocket(newSocket)
+          } else {
+            setConnectionError(data.error || '加入房间失败')
+            setIsConnecting(false)
+            toast.error(data.error || '加入房间失败')
+            newSocket.disconnect()
+          }
+        })
+      })
+
+      newSocket.on('connect_error', (error) => {
+        console.error('Connection error:', error)
+        setConnectionError('连接服务器失败，请检查网络')
+        setIsConnecting(false)
+        toast.error('连接服务器失败')
+      })
+
+      newSocket.on('player-joined', (data: { player: any; room: any }) => {
+        console.log('Player joined:', data)
+        setOpponentConnected(true)
+        toast.success('对手已加入房间！')
+      })
+
+      newSocket.on('player-ready', (data: { playerId: string; room: any }) => {
+        console.log('Player ready:', data)
+        setOpponentReady(true)
+      })
+
+      newSocket.on('game-start', (data: any) => {
+        console.log('Game started:', data)
+        toast.success('游戏开始！')
+        useGomokuStore.getState().updateFromServer({
+          status: 'playing',
+          currentTurn: data.currentTurn || 'black',
+        })
+        onGameStart(newSocket)
+      })
+
+      newSocket.on('player-left', (data: any) => {
+        console.log('Player left:', data)
+        setOpponentConnected(false)
+        setOpponentReady(false)
+        toast.error('对手已离开房间')
+      })
+
+      newSocket.on('disconnect', () => {
+        console.log('Disconnected from server')
+      })
+
+      setIsConnecting(true)
     }
-  }, [])
+  }, [startOnlineGame, onGameStart])
 
   // 设置Socket事件监听
   const setupSocketListeners = useCallback((newSocket: Socket, isCreator: boolean) => {
