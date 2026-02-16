@@ -8,7 +8,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -114,7 +113,7 @@ export function GameResultDialog({ onRestart, onHome }: GameResultDialogProps) {
           </span>
         </div>
 
-        <DialogFooter className="flex-row justify-center gap-2 sm:gap-2">
+        <div className="flex justify-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -130,7 +129,7 @@ export function GameResultDialog({ onRestart, onHome }: GameResultDialogProps) {
             <RotateCcw className="w-4 h-4 mr-1" />
             再来一局
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )
