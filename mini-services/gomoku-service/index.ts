@@ -108,9 +108,20 @@ io.on('connection', (socket: Socket) => {
   console.log(`User connected: ${socket.id}`)
 
   // 创建房间
-  socket.on('create-room', (data: { persistentId?: string }, callback: (data: { roomId: string; color: string }) => void) => {
+  socket.on('create-room', (data: { persistentId?: string } | ((data: { roomId: string; color: string }) => void), callback?: (data: { roomId: string; color: string }) => void) => {
+    // 兼容两种调用方式
+    let persistentId: string
+    let cb: (data: { roomId: string; color: string }) => void
+    
+    if (typeof data === 'function') {
+      persistentId = socket.id
+      cb = data
+    } else {
+      persistentId = (data as any).persistentId || socket.id
+      cb = callback!
+    }
+    
     const roomId = generateRoomId()
-    const persistentId = data?.persistentId || socket.id
     
     const room: GameRoom = {
       id: roomId,
@@ -129,35 +140,49 @@ io.on('connection', (socket: Socket) => {
     rooms.set(roomId, room)
     socket.join(roomId)
     console.log(`Room created: ${roomId} by ${socket.id} (persistent: ${persistentId})`)
-    callback({ roomId, color: 'black' })
+    cb({ roomId, color: 'black' })
   })
 
   // 加入房间
-  socket.on('join-room', (data: { roomId: string; persistentId?: string }, callback: (data: { success: boolean; error?: string; color?: string; room?: GameRoom }) => void) => {
-    const { roomId, persistentId } = data
+  socket.on('join-room', (data: { roomId: string; persistentId?: string } | ((data: any) => void), callback?: (data: any) => void) => {
+    // 兼容两种调用方式
+    let roomId: string
+    let persistentId: string
+    let cb: (data: any) => void
+    
+    if (typeof data === 'function') {
+      // 旧方式：只有 callback
+      cb = data as any
+      roomId = ''
+      persistentId = socket.id
+    } else {
+      roomId = (data as any).roomId
+      persistentId = (data as any).persistentId || socket.id
+      cb = callback!
+    }
+
     const room = rooms.get(roomId)
 
     console.log(`Join room request: ${roomId} by ${socket.id}, room exists: ${!!room}`)
 
     if (!room) {
-      callback({ success: false, error: '房间不存在' })
+      cb({ success: false, error: '房间不存在' })
       return
     }
 
     if (room.players.size >= 2) {
-      callback({ success: false, error: '房间已满' })
+      cb({ success: false, error: '房间已满' })
       return
     }
 
     if (room.status !== 'waiting') {
-      callback({ success: false, error: '游戏已开始' })
+      cb({ success: false, error: '游戏已开始' })
       return
     }
 
-    const playerPersistentId = persistentId || socket.id
     const player: Player = { 
       id: socket.id, 
-      persistentId: playerPersistentId, 
+      persistentId, 
       color: 'white', 
       ready: false 
     }
@@ -166,13 +191,12 @@ io.on('connection', (socket: Socket) => {
     
     console.log(`Player ${socket.id} joined room ${roomId}`)
     
-    // 通知房间内所有人
     io.to(roomId).emit('player-joined', {
       player,
       room: { ...room, players: Object.fromEntries(room.players) }
     })
     
-    callback({ success: true, color: 'white', room: { ...room, players: Object.fromEntries(room.players) } })
+    cb({ success: true, color: 'white', room: { ...room, players: Object.fromEntries(room.players) } })
   })
 
   // 重新加入房间（刷新页面后恢复状态）
