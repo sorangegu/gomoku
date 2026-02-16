@@ -124,7 +124,7 @@ export function GameResultDialog({ onRestart, onHome }: GameResultDialogProps) {
           </motion.div>
         </div>
 
-        <DialogFooter className="flex-col sm:flex-row gap-2">
+        <DialogFooter className="flex-col sm:flex-row sm:justify-center gap-2">
           <Button
             variant="outline"
             className="w-full sm:w-auto"
