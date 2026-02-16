@@ -142,8 +142,13 @@ export default function HomePage() {
     const roomFromUrl = params?.get('room')
     if (roomFromUrl) return // URL 参数由 OnlineLobby 处理
     
+    // 如果是从当前会话创建的房间，不需要重连
+    if (mode === 'online' && onlineGame.roomId && screen === 'online-lobby') {
+      // 检查是否已经在 waiting 状态（说明刚刚创建或加入了房间）
+      return
+    }
+    
     if (mode !== 'online' || !onlineGame.roomId || hasReconnected.current) return
-    if (screen !== 'online-lobby') return
     
     hasReconnected.current = true
     

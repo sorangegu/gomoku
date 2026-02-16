@@ -48,7 +48,11 @@ export function OnlineLobby({ onGameStart }: OnlineLobbyProps) {
         timeout: 10000,
       })
 
+      // 存储当前 socket id 用于过滤事件
+      let currentSocketId: string = ''
+
       newSocket.on('connect', () => {
+        currentSocketId = newSocket.id || ''
         console.log('Connected to server, joining room:', roomFromUrl.toUpperCase())
         newSocket.emit('join-room', { roomId: roomFromUrl.toUpperCase(), persistentId: playerId }, (data: any) => {
           console.log('Join room response:', data)
@@ -83,8 +87,11 @@ export function OnlineLobby({ onGameStart }: OnlineLobbyProps) {
       })
 
       newSocket.on('player-ready', (data: { playerId: string; room: any }) => {
-        console.log('Player ready:', data)
-        setOpponentReady(true)
+        console.log('Player ready:', data, 'currentSocketId:', currentSocketId)
+        // 只更新对手的准备状态，忽略自己的
+        if (data.playerId !== currentSocketId) {
+          setOpponentReady(true)
+        }
       })
 
       newSocket.on('game-start', (data: any) => {
@@ -134,8 +141,11 @@ export function OnlineLobby({ onGameStart }: OnlineLobbyProps) {
     })
 
     newSocket.on('player-ready', (data: { playerId: string; room: any }) => {
-      console.log('Player ready:', data)
-      setOpponentReady(true)
+      console.log('Player ready:', data, 'my socket id:', newSocket.id)
+      // 只更新对手的准备状态，忽略自己的
+      if (data.playerId !== newSocket.id) {
+        setOpponentReady(true)
+      }
     })
 
     newSocket.on('game-start', (data: any) => {
